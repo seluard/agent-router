@@ -54,11 +54,8 @@ func doMain() *grpc.Server {
 	}
 
 	server := grpc.NewServer()
-	authv3.RegisterAuthorizationServer(server, &ExtAuthServer{
-		AllowedHeaderValue: os.Getenv(testextauth.ExtAuthAllowedValueEnvVar),
-		MetadataHeader:     os.Getenv(testextauth.ExtAuthDynamicMetadataHeaderEnvVar),
-		MetadataByHeader:   parseMetadataByHeader(os.Getenv(testextauth.ExtAuthDynamicMetadataByHeaderEnvVar)),
-	})
+	authServer := authorizationServer()
+	authv3.RegisterAuthorizationServer(server, authServer)
 
 	go func() {
 		logger.Printf("starting ext auth server on port: %d", port)
@@ -70,10 +67,72 @@ func doMain() *grpc.Server {
 	return server
 }
 
-// parseMetadataByHeader parses a JSON object mapping a header value to the metadata fields to emit,
-// such as {"premium": {"total_limit": {"requests_per_unit": 6, "unit": "HOUR"}}}. Malformed JSON is
-// fatal rather than ignored, because a test that silently got no metadata would look like a product
-// failure.
+func authorizationServer() authv3.AuthorizationServer {
+	if os.Getenv(testextauth.ExtAuthModeEnvVar) != testextauth.ExtAuthJWTUserInfoMode {
+		return &ExtAuthServer{
+			AllowedHeaderValue: os.Getenv(testextauth.ExtAuthAllowedValueEnvVar),
+			MetadataHeader:     os.Getenv(testextauth.ExtAuthDynamicMetadataHeaderEnvVar),
+			MetadataByHeader:   parseMetadataByHeader(os.Getenv(testextauth.ExtAuthDynamicMetadataByHeaderEnvVar)),
+		}
+	}
+
+	secret := os.Getenv(testextauth.ExtAuthJWTSecretEnvVar)
+	if secret == "" {
+		logger.Fatalf("%s must be set when %s=%s", testextauth.ExtAuthJWTSecretEnvVar, testextauth.ExtAuthModeEnvVar, testextauth.ExtAuthJWTUserInfoMode)
+	}
+	userInfoURL := os.Getenv(testextauth.ExtAuthUserInfoURLVar)
+	if userInfoURL == "" {
+		logger.Fatalf("%s must be set when %s=%s", testextauth.ExtAuthUserInfoURLVar, testextauth.ExtAuthModeEnvVar, testextauth.ExtAuthJWTUserInfoMode)
+	}
+
+	limitsJSON := os.Getenv(testextauth.ExtAuthTierLimitsEnvVar)
+	if limitsJSON == "" {
+		logger.Fatalf("%s must be set when %s=%s", testextauth.ExtAuthTierLimitsEnvVar, testextauth.ExtAuthModeEnvVar, testextauth.ExtAuthJWTUserInfoMode)
+	}
+	var limits map[string]testextauth.TierLimits
+	if err := json.Unmarshal([]byte(limitsJSON), &limits); err != nil {
+		logger.Fatalf("invalid %s: %v", testextauth.ExtAuthTierLimitsEnvVar, err)
+	}
+	var projectLimits map[string]testextauth.TierLimits
+	if value := os.Getenv(testextauth.ExtAuthProjectLimitsEnvVar); value != "" {
+		if err := json.Unmarshal([]byte(value), &projectLimits); err != nil {
+			logger.Fatalf("invalid %s: %v", testextauth.ExtAuthProjectLimitsEnvVar, err)
+		}
+	}
+
+	logger.Printf("using JWT UserInfo authorization mode")
+	return &testextauth.JWTUserInfoServer{
+		Verifier: testextauth.HMACTokenVerifier{
+			Key:      []byte(secret),
+			Issuer:   os.Getenv(testextauth.ExtAuthJWTIssuerEnvVar),
+			Audience: os.Getenv(testextauth.ExtAuthJWTAudienceEnvVar),
+		},
+		UserInfo: &testextauth.HTTPUserInfoClient{URL: userInfoURL},
+		Tiers:    testextauth.MemoryTierStore(limits),
+		Projects: testextauth.MemoryProjectStore(projectLimits),
+		MetadataKeys: testextauth.MetadataKeys{
+			Daily:          firstNonEmpty(os.Getenv(testextauth.ExtAuthDailyMetadataKeyEnvVar), os.Getenv(testextauth.ExtAuthDynamicMetadataKeyEnvVar)),
+			Monthly:        os.Getenv(testextauth.ExtAuthMonthlyMetadataKeyEnvVar),
+			UserDaily:      os.Getenv(testextauth.ExtAuthUserDailyMetadataKeyEnvVar),
+			UserMonthly:    os.Getenv(testextauth.ExtAuthUserMonthlyMetadataKeyEnvVar),
+			ProjectDaily:   os.Getenv(testextauth.ExtAuthProjectDailyMetadataKeyEnvVar),
+			ProjectMonthly: os.Getenv(testextauth.ExtAuthProjectMonthlyMetadataKeyEnvVar),
+		},
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+// parseMetadataByHeader parses a JSON object mapping a header value to the metadata fields to emit.
+// Malformed JSON is fatal rather than ignored, because a test that silently got no metadata would
+// look like a product failure.
 func parseMetadataByHeader(s string) map[string]map[string]any {
 	if s == "" {
 		return nil

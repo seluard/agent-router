@@ -168,6 +168,7 @@ func initKindCluster(ctx context.Context, clusterName string) (err error) {
 		"docker.io/envoyproxy/ai-gateway-testupstream:latest",
 		"docker.io/envoyproxy/ai-gateway-testmcpserver:latest",
 		"docker.io/envoyproxy/ai-gateway-testextauthserver:latest",
+		"docker.io/envoyproxy/ai-gateway-testuserinfoserver:latest",
 	} {
 		cmd := testsinternal.GoToolCmdContext(ctx, "kind", "load", "docker-image", image, "--name", clusterName)
 		cmd.Stdout = os.Stdout

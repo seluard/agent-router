@@ -33,6 +33,13 @@ Shows how to configure automatic failover between multiple AI providers for high
 
 Demonstrates usage-based rate limiting to control costs and prevent abuse.
 
+### [Dynamic Budgeting](./dynamic-budgeting/)
+
+Advanced example showing JWT and `/userinfo`-driven budget selection through
+ext_authz, with identity-derived and shared monetary limits supplied as dynamic
+metadata to `BackendTrafficPolicy`. Its `tier` field is illustrative and can
+represent teams, groups, subscriptions, or special incident allocations.
+
 ### [Cache Control](cache/cache_control.md)
 
 Shows how to use prompt caching with Claude models to reduce costs and improve performance through provider-agnostic cache control.

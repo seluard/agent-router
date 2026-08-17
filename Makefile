@@ -241,6 +241,12 @@ test-e2e: build-e2e ## Run the end-to-end tests with a local kind cluster.
 	@echo "Run E2E tests"
 	@go test -v ./tests/e2e/... $(GO_TEST_ARGS) $(GO_TEST_E2E_ARGS)
 
+# This runs the dynamic budgeting example against a local kind cluster.
+.PHONY: test-dynamic-budgeting
+test-dynamic-budgeting: build-e2e ## Run the dynamic budgeting example against a local kind cluster.
+	@echo "Run dynamic budgeting E2E test"
+	@go test -v ./tests/e2e/... -run '^Test_Examples_DynamicBudgeting$$' $(GO_TEST_ARGS) $(GO_TEST_E2E_ARGS)
+
 # This runs the end-to-end tests for the controller and extproc with a local kind cluster.
 .PHONY: test-e2e-inference-extension
 test-e2e-inference-extension: build-e2e ## Run the end-to-end tests with a local kind cluster for Gateway API Inference Extension.
@@ -303,6 +309,14 @@ build-e2e: ## Build the docker images for the controller, extproc and testupstre
 	@$(MAKE) docker-build.testupstream CMD_PATH_PREFIX=tests/internal/testupstreamlib DOCKER_BUILD_ARGS="--load"
 	@$(MAKE) docker-build.testmcpserver CMD_PATH_PREFIX=tests/internal/testmcp DOCKER_BUILD_ARGS="--load"
 	@$(MAKE) docker-build.testextauthserver CMD_PATH_PREFIX=tests/internal/testextauth DOCKER_BUILD_ARGS="--load"
+	@$(MAKE) docker-build.testuserinfoserver CMD_PATH_PREFIX=tests/internal/testuserinfo DOCKER_BUILD_ARGS="--load"
+
+# This builds the local images used by the dynamic-budgeting example.
+.PHONY: build-dynamic-budgeting
+build-dynamic-budgeting: ## Build the local images for the dynamic-budgeting example.
+	@$(MAKE) docker-build.testupstream CMD_PATH_PREFIX=tests/internal/testupstreamlib DOCKER_BUILD_ARGS="--load"
+	@$(MAKE) docker-build.testextauthserver CMD_PATH_PREFIX=tests/internal/testextauth DOCKER_BUILD_ARGS="--load"
+	@$(MAKE) docker-build.testuserinfoserver CMD_PATH_PREFIX=tests/internal/testuserinfo DOCKER_BUILD_ARGS="--load"
 
 # This builds a docker image for a given command.
 #
