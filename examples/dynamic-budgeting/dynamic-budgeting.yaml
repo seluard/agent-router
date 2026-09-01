@@ -276,6 +276,10 @@ spec:
                   "suspended": {
                     "daily": {"requests_per_unit": 0, "unit": "DAY"},
                     "monthly": {"requests_per_unit": 0, "unit": "MONTH"}
+                  },
+                  "monthly-first": {
+                    "daily": {"requests_per_unit": 100000, "unit": "DAY"},
+                    "monthly": {"requests_per_unit": 2000, "unit": "MONTH"}
                   }
                 }
             - name: EXT_AUTH_PROJECT_LIMITS

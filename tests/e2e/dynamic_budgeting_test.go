@@ -58,11 +58,17 @@ func Test_Examples_DynamicBudgeting(t *testing.T) {
 	firstToken := dynamicBudgetingToken(t, userID)
 	secondUserID := userID + "-second"
 	secondToken := dynamicBudgetingToken(t, secondUserID)
+	monthlyUserID := userID + "-monthly"
+	monthlyToken := dynamicBudgetingToken(t, monthlyUserID)
 	users, err := json.Marshal(map[string]testextauth.UserInfo{
 		secondToken: {
 			Subject:  secondUserID,
 			Tier:     "basic",
 			Projects: []string{projectID},
+		},
+		monthlyToken: {
+			Subject: monthlyUserID,
+			Tier:    "monthly-first",
 		},
 	})
 	require.NoError(t, err)
@@ -117,6 +123,15 @@ func Test_Examples_DynamicBudgeting(t *testing.T) {
 		}
 		require.Equal(t, http.StatusTooManyRequests, request(firstToken, ""))
 		require.Equal(t, http.StatusOK, request(firstToken, projectID))
+	})
+
+	t.Run("monthly budget can be exhausted before daily budget", func(t *testing.T) {
+		// Response cost is charged after each response, so the request that reaches
+		// the exact $2.00 limit is admitted and the next request is rejected.
+		for range 3 {
+			require.Equal(t, http.StatusOK, request(monthlyToken, ""))
+		}
+		require.Equal(t, http.StatusTooManyRequests, request(monthlyToken, ""))
 	})
 
 	t.Run("project budget is shared across members", func(t *testing.T) {

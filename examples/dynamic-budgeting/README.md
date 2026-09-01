@@ -67,7 +67,9 @@ resilience while preserving token validation and authorization correctness.
 
 The `fromMetadata` field requires an Envoy Gateway build containing
 `envoyproxy/gateway#9216`; released versions that predate that change will
-silently use the static fallback limit.
+use the static `requests` and `unit` values in the policy instead. This
+example's JWT/UserInfo authorization path emits metadata for every allowed
+request, so it does not demonstrate missing-metadata fallback behavior.
 
 ## Quick start: automated validation
 
@@ -209,11 +211,13 @@ kubectl set env deployment/envoy-ai-gateway-dynamic-budgeting-userinfo \
 ```
 
 The `basic` tier has `$2.00` per day and `$20.00` per month. The `suspended`
-tier has zero in both windows. The static `4` millidollars fallback is used
-independently for each window when ext_authz emits no matching metadata. Its
-unit is `Hour` only to keep the generated local RLS configuration compatible;
-authorized requests always use the daily or monthly unit supplied in dynamic
-metadata.
+tier has zero in both windows. The `monthly-first` fixture has a `$100.00`
+daily budget and a `$2.00` monthly budget; the E2E test uses a fresh user to
+verify that the monthly rule can reject a request before the daily rule. Since
+response usage is charged after the response and request cost is zero, the
+request that reaches the exact limit is admitted; the following request is
+rejected.
+
 Because request cost is zero and response usage is charged after the upstream
 response, a zero budget admits the first request and rejects the next one.
 
